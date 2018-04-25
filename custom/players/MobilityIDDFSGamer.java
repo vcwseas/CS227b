@@ -50,6 +50,9 @@ public class MobilityIDDFSGamer extends StateMachineGamer {
 
 
 		Move bestMove = moves.get(0);
+
+		if (m.findLegals(r, s).size()==1) return bestMove;
+
 		int alpha = 0;  //best score
 		int beta = 100; //worst score'
 

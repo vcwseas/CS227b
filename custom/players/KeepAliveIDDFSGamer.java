@@ -15,7 +15,7 @@ import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 
-public class RewardIDDFSGamer extends StateMachineGamer {
+public class KeepAliveIDDFSGamer extends StateMachineGamer {
 
 	@Override
 	public StateMachine getInitialStateMachine() {
@@ -44,9 +44,10 @@ public class RewardIDDFSGamer extends StateMachineGamer {
 	private Move getBestMove(StateMachine m, Role r, MachineState s, long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException{
 		//Iterative deepening DFS with mobility heuristic
 
+		List<Move> moves = m.findLegals(r, s);
+
 		int limit=0;
 
-		List<Move> moves = m.findLegals(r, s);
 
 
 		Move bestMove = moves.get(0);
@@ -68,79 +69,95 @@ public class RewardIDDFSGamer extends StateMachineGamer {
 				}
 
 				if (tempBeta > alpha) {
+
 					alpha = tempBeta;
 					bestMove = moves.get(i);
 				}
-				// if tempAlpha < beta : beta = tempAlpha
+				else if (tempBeta==alpha) {
+					for (List<Move> joints: m.getLegalJointMoves(s, r, moves.get(i))) {
+						 if (m.findReward(r, m.getNextState(s, joints))==tempBeta && !m.isTerminal(m.getNextState(s, joints))) {
+							 bestMove = moves.get(i);
+							 break;
+						 }
+
+					}
+				}
+
+
+
 			}
 			limit++;
 		}
+
 	}
 
-	private int maxScore(StateMachine m, Role r, MachineState s, int alpha, int beta, int level, int limit, long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
-		if (m.isTerminal(s)) {
-			return m.getGoal(s, r);
+
+
+
+private int maxScore(StateMachine m, Role r, MachineState s, int alpha, int beta, int level, int limit, long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
+	if (m.isTerminal(s)) {
+		return m.getGoal(s, r);
+	}
+	if (level>=limit) return m.findReward(r, s); //returns reward
+	List<Move> moves = m.findLegals(r, s);
+	for (int i = 0; i < moves.size(); i++) {
+		if (timeout - System.currentTimeMillis() < 3000) {
+			return alpha;
 		}
-		if (level>=limit) return m.findReward(r, s); //returns reward
-		List<Move> moves = m.findLegals(r, s);
-		for (int i = 0; i < moves.size(); i++) {
-			if (timeout - System.currentTimeMillis() < 3000) {
-				return alpha;
-			}
-			int tempScore = minScore(m,r,s,moves.get(i), alpha, beta, level, limit, timeout);
+		int tempScore = minScore(m,r,s,moves.get(i), alpha, beta, level, limit, timeout);
 
-			alpha = Math.max(alpha, tempScore);  //max(alpha, beta)
-			if (alpha >= beta) {
-				return beta;
-			}
+		alpha = Math.max(alpha, tempScore);  //max(alpha, beta)
+		if (alpha >= beta) {
+			return beta;
 		}
-		return alpha;
+	}
+	return alpha;
+}
+
+private int minScore(StateMachine m, Role r, MachineState s, Move maxMove, int alpha, int beta, int level, int limit, long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
+	if (m.isTerminal(s)) {
+		return m.getGoal(s, r);
 	}
 
-	private int minScore(StateMachine m, Role r, MachineState s, Move maxMove, int alpha, int beta, int level, int limit, long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
-		if (m.isTerminal(s)) {
-			return m.getGoal(s, r);
+	List<List<Move>> jointMoves = m.getLegalJointMoves(s, r, maxMove);
+	for (List<Move> move : jointMoves) {
+		if (timeout - System.currentTimeMillis() < 3000) {
+			return beta;
 		}
-
-		List<List<Move>> jointMoves = m.getLegalJointMoves(s, r, maxMove);
-		for (List<Move> move : jointMoves) {
-			if (timeout - System.currentTimeMillis() < 3000) {
-				return beta;
-			}
-			MachineState nextState = m.getNextState(s, move);
-			int tempAlpha = maxScore(m,r,nextState, alpha, beta, level+1, limit, timeout);
-			beta = Math.min(beta,  tempAlpha);
-			if (beta <= alpha) {
-				return alpha;
-			}
+		MachineState nextState = m.getNextState(s, move);
+		int tempAlpha = maxScore(m,r,nextState, alpha, beta, level+1, limit, timeout);
+		beta = Math.min(beta,  tempAlpha);
+		if (beta <= alpha) {
+			return alpha;
 		}
-		return beta;
 	}
+	return beta;
+}
 
 
 
-	@Override
-	public void stateMachineStop() {
-		// TODO Auto-generated method stub
+@Override
+public void stateMachineStop() {
+	// TODO Auto-generated method stub
 
-	}
+}
 
-	@Override
-	public void stateMachineAbort() {
-		// TODO Auto-generated method stub
+@Override
+public void stateMachineAbort() {
+	// TODO Auto-generated method stub
 
-	}
+}
 
-	@Override
-	public void preview(Game g, long timeout) throws GamePreviewException {
-		// TODO Auto-generated method stub
+@Override
+public void preview(Game g, long timeout) throws GamePreviewException {
+	// TODO Auto-generated method stub
 
-	}
+}
 
-	@Override
-	public String getName() {
-		// TODO Auto-generated method stub
-		return "RewardIDDFSGamer";
-	}
+@Override
+public String getName() {
+	// TODO Auto-generated method stub
+	return "KeepAliveIDDFSGamer";
+}
 
 }
