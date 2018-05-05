@@ -17,7 +17,11 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 
 public class MCTS extends StateMachineGamer {
-
+	private int roleIndex;
+	private StateMachine m;
+	private MachineState s;
+	private Role r;
+	private int safety = 3000;
 	@Override
 	public StateMachine getInitialStateMachine() {
 		// From RandomGamer
@@ -27,50 +31,102 @@ public class MCTS extends StateMachineGamer {
 	@Override
 	public void stateMachineMetaGame(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
-		//no meta
-	}
+		//Determine the index of getRoles and getLegalJoinMoves that we should be using
+		roleIndex = 0;
+		r = getRole();
+		m = getStateMachine();
+		List<Role> roles = m.getRoles();
+		for (int i = 0; i< roles.size(); i++) {
+			if (r.equals(roles.get(i))) {
+				roleIndex = i;
+				break;
+			}
+		}
+ 	}
 
 	@Override
 	public Move stateMachineSelectMove(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
-		StateMachine m = getStateMachine();
-		Role r = getRole();
-		MachineState s = getCurrentState();
-
-		Node n = new Node(null, null, s);
-		Move move = getBestMove(n, m,r,s, timeout);
+		s = getCurrentState();
+		List<Move> lm = m.getLegalMoves(s, r);
+		if (lm.size() == 1) {
+			return lm.get(0);
+		}
+		Node root = new Node(null, 0, s);
+		Move move = getBestMove(root, timeout);
 		return move;
 	}
 
-	private Move getBestMove(Node n, StateMachine m, Role r, MachineState s, long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException{
-		while (timeout - System.currentTimeMillis() > 3000) {
-			Node newNode = select(n);
-			expand(newNode, m, r, s);
+	private Move getBestMove(Node root, long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+		while (timeout - System.currentTimeMillis() > this.safety) {
+			Node newNode = select(root);
+			expand(newNode);
 			int score = depthCharge(m, r, newNode.state);
+
 			backpropagate(newNode, score);
 		}
-		return n.myBestMove(r, m);
+		return myBestMove(root);
 	}
 
-	private Node select(Node n) {
-		if (n.visits == 0) {
-			return n;
-		}
-		for (Node child : n.children) {
-			if (child.visits == 0) {
-				return child;
+	private Move myBestMove(Node root) {
+		double bestScore = 0;
+		int bestMoveIndex = 0;
+
+		for (moveNode subNode: root.children) {
+			double testScore = (double) subNode.utility / subNode.visits;
+			System.out.println(root.legalMoves.get(subNode.moveNumber) + " U" + subNode.utility + " V" + subNode.visits + " Score " + testScore);
+			if (testScore > bestScore) {
+				bestScore = testScore;
+				bestMoveIndex = subNode.moveNumber;
 			}
 		}
-		double score = 0;
-		Node result = n;
-		for (Node child : n.children) {
-			double tempScore = selectfn(child);
-			if (tempScore > score) {
-				score = tempScore;
-				result = child;
+		System.out.println(bestScore);
+		return root.legalMoves.get(bestMoveIndex);
+	}
+
+	private int depthCharge(StateMachine m, Role r, MachineState s) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
+		if (m.isTerminal(s)) {
+			return m.getGoal(s, r);
+		}
+		List<Move> jointMoves = m.getRandomJointMove(s);
+		return depthCharge(m,r,m.getNextState(s, jointMoves));
+	}
+
+	private void backpropagate(Node node, int score) {
+		while (node.parent != null) {
+			node.utility += score;
+			node.visits += 1;
+			node.parent.children.get(node.moveNumber).utility += score;
+			node.parent.children.get(node.moveNumber).visits += 1;
+			node = node.parent;
+		}
+		node.utility += score;
+		node.visits += 1;
+	}
+
+	private Node select(Node node) {
+		if (node.isLeaf()) {
+			return node;
+		}
+		Node bestNode = node.children.get(0).children.get(0);
+		double bestScore = 0;
+		for (moveNode subNode: node.children) {
+			for (Node nextNode : subNode.children) {
+				if (nextNode.visits == 0) {
+					return nextNode;
+				}
+				double testScore = selectfn(nextNode);
+				if (testScore > bestScore) {
+					bestScore = testScore;
+					bestNode = nextNode;
+				}
 			}
 		}
-		return select(result);
+		return select(bestNode);
+	}
+
+	public void expand(Node node) throws MoveDefinitionException, TransitionDefinitionException {
+		node.expand(node);
 	}
 
 	private double selectfn(Node n) {
@@ -79,30 +135,6 @@ public class MCTS extends StateMachineGamer {
 		return exploit + explore;
 	}
 
-	private void expand(Node n, StateMachine m, Role r, MachineState s) throws MoveDefinitionException, TransitionDefinitionException{
-		List<List<Move>> jointMoves = m.getLegalJointMoves(s);
-		for (List<Move> move: jointMoves) {
-			MachineState nextState = m.findNext(move, s);
-			n.addChild(move, nextState);
-		}
-	}
-
-	private int depthCharge(StateMachine m, Role r, MachineState s) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
-		if (m.isTerminal(s)) {
-			return m.getGoal(s, r);
-		}
-		//approximates value of state by expected value (random moves for opponents)
-		List<Move> jointMoves = m.getRandomJointMove(s);
-		return depthCharge(m,r,m.getNextState(s, jointMoves));
-	}
-
-	private void backpropagate(Node n, int score) {
-		n.incrementVisits();
-		n.incrementUtility(score);
-		if (n.parent != null) {
-			backpropagate(n.parent, score);
-		}
-	}
 
 	@Override
 	public void stateMachineStop() {
@@ -124,65 +156,55 @@ public class MCTS extends StateMachineGamer {
 	}
 
 	class Node {
-		//TODO:
-		//may need to make opponent actions contingent on my actions
-		//that is, may need to index children nodes by a dictionary {myMove : arrayList<Node> children}
-		//where children in the dictionary are simulated by random opponent actions.
+		public Node parent = null;
+		public List<Move> legalMoves;
+		public List<moveNode> children = new ArrayList<moveNode>();
+		public int moveNumber;
+		public MachineState state;
+		public double utility = 0;
+		public double visits = 0;
 
-		Node parent;
-		MachineState state; //the state this node represents
-		List<Move> move; //move from parent node that resulted in this node
-		int visits;
-		ArrayList<Node> children;
-		int utility;
-
-		public Node(Node parent, List<Move> move, MachineState state) {
+		public Node(Node parent, int moveNumber, MachineState state)  {
 			this.parent = parent;
-			this.move = move;
 			this.state = state;
-			this.visits = 0;
-			this.children = new ArrayList<Node>();
-			this.utility = 0;
+			this.moveNumber = moveNumber;
 		}
 
-		public void incrementUtility (int u) {
-			this.utility += u;
-		}
-
-		public void incrementVisits() {
-			this.visits +=1;
-		}
-
-		public int getUtility() {
-			return this.utility;
-		}
-
-		public int getVisits() {
-			return this.visits;
-		}
-
-		public ArrayList<Node> getChildren() {
-			return this.children;
-		}
-
-		public Node addChild(List<Move> move, MachineState state) {
-			Node child = new Node(this, move, state);
-			this.children.add(child);
-			return child;
-		}
-
-		public Move myBestMove(Role r, StateMachine m) {
-			//returns the move that results in the highest utility child
-			int score = 0;
-			int index = m.getRoleIndices().get(r);
-			List<Move> jointMove = this.move;
-			for (Node c : this.children) {
-				if (c.utility > score) {
-					score = c.utility;
-					jointMove = c.move;
-				}
+		public void expand(Node node) throws MoveDefinitionException, TransitionDefinitionException {
+			if (m.isTerminal(node.state)) {
+				return;
 			}
-			return jointMove.get(index);
+			this.legalMoves = m.getLegalMoves(this.state, r);
+
+			for (int i = 0; i< this.legalMoves.size(); i++) {
+				moveNode subNode = new moveNode(this, this.legalMoves.get(i), i);
+				this.children.add(subNode);
+			}
+		}
+
+		public Node getParent() {
+			return this.parent;
+		}
+
+		public boolean isLeaf() {
+			return this.children.isEmpty();
+		}
+
+	}
+
+	class moveNode {
+		List<Node> children = new ArrayList<Node>();
+		public double utility = 0;
+		public double visits = 0;
+		public int moveNumber;
+		public moveNode(Node parent, Move move, int moveNumber) throws MoveDefinitionException, TransitionDefinitionException {
+			List<List<Move>> jointMoves = m.getLegalJointMoves(parent.state, r, move);
+			for (List<Move> jointMove: jointMoves) {
+				MachineState nextState = m.getNextState(parent. state, jointMove);
+				Node nextNode = new Node(parent, moveNumber, nextState);
+				children.add(nextNode);
+			}
+			this.moveNumber = moveNumber;
 		}
 	}
 
