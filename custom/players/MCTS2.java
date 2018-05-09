@@ -17,7 +17,7 @@ import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
 import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 
 public class MCTS2 extends StateMachineGamer {
-	int numCharges=100;
+	int numCharges=10;
 	private int roleIndex;
 	private StateMachine m;
 	private MachineState s;
@@ -43,6 +43,40 @@ public class MCTS2 extends StateMachineGamer {
 				break;
 			}
 		}
+
+//		List<GdlRule> rules=new ArrayList<GdlRule>();
+//		List<Gdl> updated=new ArrayList<Gdl>();
+//
+//		for (Gdl gdl: getMatch().getGame().getRules()) {
+//			if (gdl instanceof GdlRule) rules.add((GdlRule)gdl);
+//			else updated.add(gdl);
+//		}
+//
+//		for (GdlRule rule: rules) {
+//			ArrayList<GdlLiteral> newGoals=new ArrayList<GdlLiteral>();
+//			GdlSentence newHead=rule.getHead();
+//			List<GdlLiteral> oldGoals=rule.getBody();
+//			List<GdlVariable> boundedVars=new ArrayList<GdlVariable>();
+//
+//
+//			while (oldGoals.size()>0) {
+//				newGoals.add(oldGoals.remove(0));
+//				for (GdlLiteral s: oldGoals) {
+//
+//				}
+//
+//			}
+//
+//
+//			//GdlRule newRule=new GdlRule();
+//			//newRule.add("rule");
+//			//newRule.
+//
+//		}
+
+
+
+
  	}
 
 	@Override
@@ -67,7 +101,7 @@ public class MCTS2 extends StateMachineGamer {
 				score += depthCharge(m, r, newNode.state);
 			}
 			score/=numCharges;
-			backpropagate(newNode, score);
+			BPtoN(newNode, score);
 		}
 		return myBestMove(root);
 	}
@@ -84,7 +118,6 @@ public class MCTS2 extends StateMachineGamer {
 				bestMoveIndex = subNode.moveNumber;
 			}
 		}
-		System.out.println(bestScore);
 		return root.legalMoves.get(bestMoveIndex);
 	}
 
@@ -96,35 +129,49 @@ public class MCTS2 extends StateMachineGamer {
 		return depthCharge(m,r,m.getNextState(s, jointMoves));
 	}
 
-	private void backpropagate(Node node, int score) {
-		while (node.parent != null) {
-			node.utility += score;
-			node.visits += 1;
-			node.parent.children.get(node.moveNumber).utility += score;
-			node.parent.children.get(node.moveNumber).visits += 1;
-			node = node.parent;
-		}
+	private void BPtoN(Node node, int score) {
 		node.utility += score;
 		node.visits += 1;
+		if (node.parent!=null) BPtoMN(node.parent,score);
 	}
+
+	private void BPtoMN(moveNode node, int score) {
+		node.utility += score;
+		node.visits += 1;
+		BPtoN(node.parent,score);
+	}
+
 
 	private Node select(Node node) {
 		if (node.isLeaf()) {
 			return node;
 		}
-		Node bestNode = node.children.get(0).children.get(0);
-		double bestScore = 0;
+		double bestintscore=0;
+		moveNode bestintnode=node.children.get(0);
 		for (moveNode subNode: node.children) {
-			for (Node nextNode : subNode.children) {
-				if (nextNode.visits == 0) {
-					return nextNode;
+			if (subNode.visits == 0) {
+				bestintnode=subNode;
+				break;
+			}
+			double tempScore = selectfn(subNode);
+			System.out.println(tempScore);
+			if (tempScore > bestintscore) {
+				bestintscore = tempScore;
+				bestintnode = subNode;
+			}
+		}
+		double bestScore = 0;
+		Node bestNode=bestintnode.children.get(0);
+		for (Node subNode: bestintnode.children) {
+				if (subNode.visits == 0) {
+					return subNode;
 				}
-				double testScore = selectfn(nextNode);
+				double testScore = selectfnmin(subNode);
 				if (testScore > bestScore) {
 					bestScore = testScore;
-					bestNode = nextNode;
+					bestNode = subNode;
 				}
-			}
+
 		}
 		return select(bestNode);
 	}
@@ -133,10 +180,16 @@ public class MCTS2 extends StateMachineGamer {
 		node.expand(node);
 	}
 
-	private double selectfn(Node n) {
+	private double selectfn(moveNode n) {
 		double exploit = (double) n.utility/n.visits;
-		double explore = Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
+		double explore = 20*Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
 		return exploit + explore;
+	}
+
+	private double selectfnmin(Node n) {
+		double exploit = (double) n.utility/n.visits;
+		double explore = 20*Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
+		return -exploit + explore;
 	}
 
 
@@ -160,7 +213,7 @@ public class MCTS2 extends StateMachineGamer {
 	}
 
 	class Node {
-		public Node parent = null;
+		public moveNode parent = null;
 		public List<Move> legalMoves;
 		public List<moveNode> children = new ArrayList<moveNode>();
 		public int moveNumber;
@@ -168,7 +221,7 @@ public class MCTS2 extends StateMachineGamer {
 		public double utility = 0;
 		public double visits = 0;
 
-		public Node(Node parent, int moveNumber, MachineState state)  {
+		public Node(moveNode parent, int moveNumber, MachineState state)  {
 			this.parent = parent;
 			this.state = state;
 			this.moveNumber = moveNumber;
@@ -186,7 +239,7 @@ public class MCTS2 extends StateMachineGamer {
 			}
 		}
 
-		public Node getParent() {
+		public moveNode getParent() {
 			return this.parent;
 		}
 
@@ -201,11 +254,13 @@ public class MCTS2 extends StateMachineGamer {
 		public double utility = 0;
 		public double visits = 0;
 		public int moveNumber;
+		public Node parent;
 		public moveNode(Node parent, Move move, int moveNumber) throws MoveDefinitionException, TransitionDefinitionException {
+			this.parent=parent;
 			List<List<Move>> jointMoves = m.getLegalJointMoves(parent.state, r, move);
 			for (List<Move> jointMove: jointMoves) {
 				MachineState nextState = m.getNextState(parent. state, jointMove);
-				Node nextNode = new Node(parent, moveNumber, nextState);
+				Node nextNode = new Node(this, moveNumber, nextState);
 				children.add(nextNode);
 			}
 			this.moveNumber = moveNumber;
