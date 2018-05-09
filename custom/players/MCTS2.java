@@ -18,6 +18,7 @@ import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;
 
 public class MCTS2 extends StateMachineGamer {
 	int numCharges=10;
+	int expCnst=30;
 	private int roleIndex;
 	private StateMachine m;
 	private MachineState s;
@@ -87,10 +88,126 @@ public class MCTS2 extends StateMachineGamer {
 		if (lm.size() == 1) {
 			return lm.get(0);
 		}
+
+		if (m.getRoles().size()==1) return getSPmove(timeout);
 		Node root = new Node(null, 0, s);
 		Move move = getBestMove(root, timeout);
 		return move;
 	}
+
+	//
+	//
+	//  Singleplayer
+	//
+	//
+
+	private Move getSPmove (long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
+
+		SPNode root = new SPNode(null, 0, s);
+		while (timeout - System.currentTimeMillis() > this.safety) {
+			SPNode newNode = selectSP(root);
+			expandSP(newNode);
+			int score=0;
+			for (int i=0; i<numCharges; i++) {
+				score += depthCharge(m, r, newNode.state);
+			}
+			score/=numCharges;
+			BP(newNode, score);
+		}
+
+		double bestScore = 0;
+		int bestMoveIndex = 0;
+
+		for (SPNode subNode: root.children) {
+			double testScore = (double) subNode.utility / subNode.visits;
+			System.out.println(root.legalMoves.get(subNode.moveNumber) + " U" + subNode.utility + " V" + subNode.visits + " Score " + testScore);
+			if (testScore > bestScore) {
+				bestScore = testScore;
+				bestMoveIndex = subNode.moveNumber;
+			}
+		}
+		return root.legalMoves.get(bestMoveIndex);
+	}
+
+	public void expandSP(SPNode node) throws MoveDefinitionException, TransitionDefinitionException {
+		node.expand(node);
+	}
+
+	private void BP(SPNode node, int score) {
+		node.utility += score;
+		node.visits += 1;
+		if (node.parent!=null) BP(node.parent,score);
+	}
+
+	class SPNode {
+		public SPNode parent = null;
+		public List<Move> legalMoves;
+		public List<SPNode> children = new ArrayList<SPNode>();
+		public int moveNumber;
+		public MachineState state;
+		public double utility = 0;
+		public double visits = 0;
+
+		public SPNode(SPNode parent, int moveNumber, MachineState state)  {
+			this.parent = parent;
+			this.state = state;
+			this.moveNumber = moveNumber;
+		}
+
+		public void expand(SPNode node) throws MoveDefinitionException, TransitionDefinitionException {
+			if (m.isTerminal(node.state)) {
+				return;
+			}
+			this.legalMoves = m.getLegalMoves(this.state, r);
+
+			for (int i = 0; i< this.legalMoves.size(); i++) {
+				SPNode subNode = new SPNode(this, i, m.getNextState(node.state, m.getLegalJointMoves(node.state, r, this.legalMoves.get(i)).get(0)));
+				this.children.add(subNode);
+			}
+		}
+
+		public SPNode getParent() {
+			return this.parent;
+		}
+
+		public boolean isLeaf() {
+			return this.children.isEmpty();
+		}
+	}
+
+	private SPNode selectSP(SPNode node) {
+		if (node.isLeaf()) {
+			return node;
+		}
+		double bestintscore=0;
+		SPNode bestintnode=node.children.get(0);
+		for (SPNode subNode: node.children) {
+			if (subNode.visits == 0) {
+				bestintnode=subNode;
+				break;
+			}
+			double tempScore = SPselectfn(subNode);
+			if (tempScore > bestintscore) {
+				bestintscore = tempScore;
+				bestintnode = subNode;
+			}
+		}
+		return selectSP(bestintnode);
+	}
+
+	private double SPselectfn(SPNode n) {
+		double exploit = (double) n.utility/n.visits;
+		double explore = expCnst*Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
+		return exploit + explore;
+	}
+
+
+
+	//
+	//
+	//  Multiplayer
+	//
+	//
 
 	private Move getBestMove(Node root, long timeout) throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		while (timeout - System.currentTimeMillis() > this.safety) {
@@ -141,7 +258,6 @@ public class MCTS2 extends StateMachineGamer {
 		BPtoN(node.parent,score);
 	}
 
-
 	private Node select(Node node) {
 		if (node.isLeaf()) {
 			return node;
@@ -154,7 +270,6 @@ public class MCTS2 extends StateMachineGamer {
 				break;
 			}
 			double tempScore = selectfn(subNode);
-			System.out.println(tempScore);
 			if (tempScore > bestintscore) {
 				bestintscore = tempScore;
 				bestintnode = subNode;
@@ -171,7 +286,6 @@ public class MCTS2 extends StateMachineGamer {
 					bestScore = testScore;
 					bestNode = subNode;
 				}
-
 		}
 		return select(bestNode);
 	}
@@ -182,16 +296,17 @@ public class MCTS2 extends StateMachineGamer {
 
 	private double selectfn(moveNode n) {
 		double exploit = (double) n.utility/n.visits;
-		double explore = 20*Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
+		double explore = expCnst*Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
+		System.out.println(explore);
 		return exploit + explore;
 	}
 
 	private double selectfnmin(Node n) {
 		double exploit = (double) n.utility/n.visits;
-		double explore = 20*Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
+		double explore = expCnst*Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
+		System.out.println(explore);
 		return -exploit + explore;
 	}
-
 
 	@Override
 	public void stateMachineStop() {
