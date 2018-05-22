@@ -28,6 +28,7 @@ public class PropNetGamer extends StateMachineGamer {
 	private MachineState s;
 	private Role r;
 	private int safety = 3000;
+	PNStateMachine PNSM;
 
 	@Override
 	public StateMachine getInitialStateMachine() {
@@ -36,7 +37,7 @@ public class PropNetGamer extends StateMachineGamer {
 	}
 
 	private double metaDC(StateMachine m, MachineState s, int i) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
-		if (m.isTerminal(s)) return i+1;
+		if (PNSM.findTerminalp(s)) return i+1;
 		List<Move> jointMoves = m.getRandomJointMove(s);
 		return metaDC(m,m.getNextState(s, jointMoves),i+1);
 	}
@@ -59,16 +60,16 @@ public class PropNetGamer extends StateMachineGamer {
 		roleIndex = 0;
 		r = getRole();
 		m = getStateMachine();
-		List<Role> roles = m.getRoles();
-		for (int i = 0; i< roles.size(); i++) {
-			if (r.equals(roles.get(i))) {
-				roleIndex = i;
-				break;
-			}
-		}
+//		List<Role> roles = PNSM.getRoles();
+//		for (int i = 0; i< roles.size(); i++) {
+//			if (r.equals(roles.get(i))) {
+//				roleIndex = i;
+//				break;
+//			}
+//		}
 
 		try {
-			PNStateMachine PNSM = new PNStateMachine(getMatch().getGame().getRules());
+			PNSM = new PNStateMachine(getMatch().getGame().getRules());
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -119,14 +120,14 @@ public class PropNetGamer extends StateMachineGamer {
 	public Move stateMachineSelectMove(long timeout)
 			throws TransitionDefinitionException, MoveDefinitionException, GoalDefinitionException {
 		s = getCurrentState();
-		List<Move> lm = m.getLegalMoves(s, r);
+		List<Move> lm = PNSM.getLegals(r, s);
 		if (lm.size() == 1) return lm.get(0);
 
 		currDepth++;
 		System.out.println(currDepth);
 		System.out.println(expCnst());
 
-		if (m.getRoles().size()==1) return getSPmove(timeout);
+		if (PNSM.getRoles().size()==1) return getSPmove(timeout);
 		Node root = new Node(null, 0, s);
 		Move move = getBestMove(root, timeout);
 		System.out.println(dc);
@@ -279,7 +280,7 @@ public class PropNetGamer extends StateMachineGamer {
 
 	private int depthCharge(StateMachine m, Role r, MachineState s) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
 		if (m.isTerminal(s)) {
-			return m.getGoal(s, r);
+			return PNSM.getReward(r, s);
 		}
 		List<Move> jointMoves = m.getRandomJointMove(s);
 		return depthCharge(m,r,m.getNextState(s, jointMoves));
@@ -380,10 +381,10 @@ public class PropNetGamer extends StateMachineGamer {
 		}
 
 		public void expand(Node node) throws MoveDefinitionException, TransitionDefinitionException {
-			if (m.isTerminal(node.state)) {
+			if (PNSM.findTerminalp(node.state)) {
 				return;
 			}
-			this.legalMoves = m.getLegalMoves(this.state, r);
+			this.legalMoves = PNSM.getLegals(r, this.state);
 
 			for (int i = 0; i< this.legalMoves.size(); i++) {
 				moveNode subNode = new moveNode(this, this.legalMoves.get(i), i);

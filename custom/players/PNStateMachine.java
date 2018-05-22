@@ -27,6 +27,10 @@ public class PNStateMachine {
 		PN = OptimizingPropNetFactory.create(rules, true);
 	}
 
+	public List<Role> getRoles() {
+		return PN.getRoles();
+	}
+
 	private void markBases(Set<GdlSentence> sentences){
 		for (GdlSentence sent: PN.getBasePropositions().keySet()){
 			PN.getBasePropositions().get(sent).setValue(sentences.contains(sent));
@@ -56,6 +60,53 @@ public class PNStateMachine {
 		return moves;
 	}
 
+//	 public List<List<Move>> getLegalJointMoves(MachineState s, Role r, Move move) throws MoveDefinitionException
+//	    {
+//	        List<List<Move>> legals = new ArrayList<List<Move>>();
+//	        for (Role role : PN.getRoles()) {
+//	            if (role.equals(r)) {
+//	                List<Move> m = new ArrayList<Move>();
+//	                m.add(move);
+//	                legals.add(m);
+//	            } else {
+//	                legals.add(getLegals(r, s));
+//	            }
+//	        }
+//
+//	        List<List<Move>> crossProduct = new ArrayList<List<Move>>();
+//	        crossProductLegalMoves(legals, crossProduct, new LinkedList<Move>());
+//
+//	        return crossProduct;
+//	    }
+//
+//	 public List<Move> getRandomJointMove(MachineState s) throws MoveDefinitionException
+//	    {
+//	        List<Move> randomMoves = new ArrayList<Move>();
+//	        for (Role role : PN.getRoles()) {
+//	        	randomMoves.add(getRandomMove(s, role));
+//	        }
+//	        return randomMoves;
+//	    }
+//
+//	 public Move getRandomMove(MachineState s, Role r) throws MoveDefinitionException
+//	    {
+//	        List<Move> legals = getLegals(r, s);
+//	        return legals.get(new Random().nextInt(legals.size()));
+//	    }
+//
+//	 private void crossProductLegalMoves(List<List<Move>> legals, List<List<Move>> crossProduct, LinkedList<Move> partial)
+//	    {
+//	        if (partial.size() == legals.size()) {
+//	            crossProduct.add(new ArrayList<Move>(partial));
+//	        } else {
+//	            for (Move move : legals.get(partial.size())) {
+//	                partial.addLast(move);
+//	                crossProductLegalMoves(legals, crossProduct, partial);
+//	                partial.removeLast();
+//	            }
+//	        }
+//	    }
+
 	public MachineState getNextState(List<Move> moves, MachineState s) {
 
 		//TODO: Implement
@@ -76,7 +127,9 @@ public class PNStateMachine {
 
 	public boolean findTerminalp(MachineState s) {
 		markBases(s.getContents());
-		return PN.getTerminalProposition().getValue();
+		boolean b = propMark(PN.getTerminalProposition());
+		clearPN();
+		return b;
 	}
 
 	private boolean propMark(Component c){
