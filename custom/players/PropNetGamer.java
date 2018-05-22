@@ -163,13 +163,13 @@ public class PropNetGamer extends StateMachineGamer {
 		}
 
 		public void expand(SPNode node) throws MoveDefinitionException, TransitionDefinitionException {
-			if (m.isTerminal(node.state)) {
+			if (PNSM.isTerminal(node.state)) {
 				return;
 			}
-			this.legalMoves = m.getLegalMoves(this.state, r);
+			this.legalMoves = PNSM.getLegalMoves(this.state, r);
 
 			for (int i = 0; i< this.legalMoves.size(); i++) {
-				SPNode subNode = new SPNode(this, i, m.getNextState(node.state, m.getLegalJointMoves(node.state, r, this.legalMoves.get(i)).get(0)));
+				SPNode subNode = new SPNode(this, i, m.getNextState(node.state, PNSM.getLegalJointMoves(node.state, r, this.legalMoves.get(i)).get(0)));
 				this.children.add(subNode);
 			}
 		}
@@ -249,10 +249,10 @@ public class PropNetGamer extends StateMachineGamer {
 	}
 
 	private int depthCharge(StateMachine m, Role r, MachineState s) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
-		if (m.isTerminal(s)) {
+		if (PNSM.isTerminal(s)) {
 			return PNSM.getGoal(s,r);
 		}
-		List<Move> jointMoves = m.getRandomJointMove(s);
+		List<Move> jointMoves = PNSM.getRandomJointMove(s);
 		return depthCharge(m,r,m.getNextState(s, jointMoves));
 	}
 
