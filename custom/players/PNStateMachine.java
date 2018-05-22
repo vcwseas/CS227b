@@ -1,6 +1,7 @@
 package ass1;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -17,9 +18,13 @@ import org.ggp.base.util.propnet.architecture.components.Transition;
 import org.ggp.base.util.propnet.factory.OptimizingPropNetFactory;
 import org.ggp.base.util.statemachine.MachineState;
 import org.ggp.base.util.statemachine.Move;
-import org.ggp.base.util.statemachine.Role;;
+import org.ggp.base.util.statemachine.Role;
+import org.ggp.base.util.statemachine.StateMachine;
+import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
+import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
+import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;;
 
-public class PNStateMachine {
+public class PNStateMachine extends StateMachine {
 
 	PropNet PN;
 
@@ -27,6 +32,7 @@ public class PNStateMachine {
 		PN = OptimizingPropNetFactory.create(rules, true);
 	}
 
+	@Override
 	public List<Role> getRoles() {
 		return PN.getRoles();
 	}
@@ -47,89 +53,6 @@ public class PNStateMachine {
 		for (Proposition p: PN.getPropositions()) {
 			p.setValue(false);
 		}
-	}
-
-	public List<Move> getLegals(Role r,MachineState s) {
-		markBases(s.getContents());
-		Set<Proposition> legals=PN.getLegalPropositions().get(r);
-		List<Move> moves=new ArrayList<Move>();
-		for (Proposition p: legals) {
-			if (propMark((Component) p)) moves.add(new Move(p.getName().getBody().get(1)));
-		}
-		clearPN();
-		return moves;
-	}
-
-//	 public List<List<Move>> getLegalJointMoves(MachineState s, Role r, Move move) throws MoveDefinitionException
-//	    {
-//	        List<List<Move>> legals = new ArrayList<List<Move>>();
-//	        for (Role role : PN.getRoles()) {
-//	            if (role.equals(r)) {
-//	                List<Move> m = new ArrayList<Move>();
-//	                m.add(move);
-//	                legals.add(m);
-//	            } else {
-//	                legals.add(getLegals(r, s));
-//	            }
-//	        }
-//
-//	        List<List<Move>> crossProduct = new ArrayList<List<Move>>();
-//	        crossProductLegalMoves(legals, crossProduct, new LinkedList<Move>());
-//
-//	        return crossProduct;
-//	    }
-//
-//	 public List<Move> getRandomJointMove(MachineState s) throws MoveDefinitionException
-//	    {
-//	        List<Move> randomMoves = new ArrayList<Move>();
-//	        for (Role role : PN.getRoles()) {
-//	        	randomMoves.add(getRandomMove(s, role));
-//	        }
-//	        return randomMoves;
-//	    }
-//
-//	 public Move getRandomMove(MachineState s, Role r) throws MoveDefinitionException
-//	    {
-//	        List<Move> legals = getLegals(r, s);
-//	        return legals.get(new Random().nextInt(legals.size()));
-//	    }
-//
-//	 private void crossProductLegalMoves(List<List<Move>> legals, List<List<Move>> crossProduct, LinkedList<Move> partial)
-//	    {
-//	        if (partial.size() == legals.size()) {
-//	            crossProduct.add(new ArrayList<Move>(partial));
-//	        } else {
-//	            for (Move move : legals.get(partial.size())) {
-//	                partial.addLast(move);
-//	                crossProductLegalMoves(legals, crossProduct, partial);
-//	                partial.removeLast();
-//	            }
-//	        }
-//	    }
-
-	public MachineState getNextState(List<Move> moves, MachineState s) {
-
-		//TODO: Implement
-		clearPN();
-		return s;
-	}
-
-	public int getReward(Role r, MachineState s) {
-		int goal=0;
-		markBases(s.getContents());
-		Set<Proposition> goals=PN.getGoalPropositions().get(r);
-		for (Proposition p: goals) {
-			if (propMark(p)) goal = Integer.parseInt(p.getName().getBody().get(1).toString());
-		}
-		clearPN();
-		return goal;
-	}
-
-	public boolean findTerminalp(MachineState s) {
-		markBases(s.getContents());
-		boolean b = propMark(PN.getTerminalProposition());
-		clearPN();
-		return b;
 	}
 
 	private boolean propMark(Component c){
@@ -166,6 +89,74 @@ public class PNStateMachine {
 		}
 
 		return false;
+	}
+
+	@Override
+	public List<Move> findActions(Role role) throws MoveDefinitionException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public void initialize(List<Gdl> description) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public int getGoal(MachineState s, Role r) throws GoalDefinitionException {
+		int goal=0;
+		markBases(s.getContents());
+		Set<Proposition> goals=PN.getGoalPropositions().get(r);
+		for (Proposition p: goals) {
+			if (propMark(p)) goal = Integer.parseInt(p.getName().getBody().get(1).toString());
+		}
+		clearPN();
+		return goal;
+	}
+
+	@Override
+	public boolean isTerminal(MachineState s) {
+		markBases(s.getContents());
+		boolean b = propMark(PN.getTerminalProposition());
+		clearPN();
+		return b;
+	}
+
+	@Override
+	public MachineState getInitialState() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public List<Move> getLegalMoves(MachineState s, Role r) throws MoveDefinitionException {
+		markBases(s.getContents());
+		Set<Proposition> legals=PN.getLegalPropositions().get(r);
+		List<Move> moves=new ArrayList<Move>();
+		for (Proposition p: legals) {
+			if (propMark((Component) p)) moves.add(new Move(p.getName().getBody().get(1)));
+		}
+		clearPN();
+		return moves;
+	}
+
+	@Override
+	public MachineState getNextState(MachineState s, List<Move> moves) throws TransitionDefinitionException {
+		Set<GdlSentence> set= new HashSet<GdlSentence>();
+		for (Move move: moves) {
+			set.add(move.getContents().toSentence());
+		}
+		markActions(set);
+		markBases(s.getContents());
+
+		Set<GdlSentence> nextState=new HashSet<GdlSentence>();
+
+		for (GdlSentence sent: PN.getBasePropositions().keySet()) {
+			if (propMark(PN.getBasePropositions().get(sent).getSingleInput().getSingleInput())) nextState.add(sent);
+		}
+		clearPN();
+		return new MachineState(nextState);
 	}
 
 
