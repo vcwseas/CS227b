@@ -34,17 +34,18 @@ public class PropNetGamer extends StateMachineGamer {
 		return new CachedStateMachine(new ProverStateMachine());
 	}
 
-//	private double metaDC(StateMachine m, MachineState s, int i) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
-//		if (PNSM.findTerminalp(s)) return i+1;
+//	private double metaDC(StateMachine m, MachineState s, int i, long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
+//		if (timeout - System.currentTimeMillis() < this.safety) return i;
+//		if (PNSM.isTerminal(s)) return i+1;
 //		List<Move> jointMoves = m.getRandomJointMove(s);
-//		return metaDC(m,PNSM.getNextState(jointMoves, s),i+1);
+//		return metaDC(m,PNSM.getNextState(s, jointMoves),i+1,timeout);
 //	}
 
-	private double recursionlessMetaDC(StateMachine m, MachineState s,long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
+	private double recursionlessMetaDC(MachineState s,long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
 		double i=0;
 		while (!PNSM.isTerminal(s) && timeout - System.currentTimeMillis() > this.safety) {
 			List<Move> jointMoves = PNSM.getRandomJointMove(s);
-			s=m.getNextState(s, jointMoves);
+			s=PNSM.getNextState(s, jointMoves);
 			i++;
 		}
 		return i+1;
@@ -76,9 +77,8 @@ public class PropNetGamer extends StateMachineGamer {
 		double levels=0;
 
 		while (timeout - System.currentTimeMillis() > this.safety) {
-			levels+=recursionlessMetaDC(m, m.getInitialState(),timeout);
+			levels+=recursionlessMetaDC(m.getInitialState(),timeout);
 			count++;
-
 		}
 		avgDepth=levels/count*3/2;
 
@@ -117,7 +117,7 @@ public class PropNetGamer extends StateMachineGamer {
 			expandSP(newNode);
 			int score=0;
 			for (int i=0; i<numCharges; i++) {
-				score += depthCharge(m, r, newNode.state);
+				score += depthCharge(r, newNode.state);
 			}
 			score/=numCharges;
 			BP(newNode, score);
@@ -169,7 +169,7 @@ public class PropNetGamer extends StateMachineGamer {
 			this.legalMoves = PNSM.getLegalMoves(this.state, r);
 
 			for (int i = 0; i< this.legalMoves.size(); i++) {
-				SPNode subNode = new SPNode(this, i, m.getNextState(node.state, PNSM.getLegalJointMoves(node.state, r, this.legalMoves.get(i)).get(0)));
+				SPNode subNode = new SPNode(this, i, PNSM.getNextState(node.state, PNSM.getLegalJointMoves(node.state, r, this.legalMoves.get(i)).get(0)));
 				this.children.add(subNode);
 			}
 		}
@@ -225,7 +225,7 @@ public class PropNetGamer extends StateMachineGamer {
 			int score=0;
 			for (int i=0; i<numCharges; i++) {
 				dc++;
-				score += depthCharge(m, r, newNode.state);
+				score += depthCharge(r, newNode.state);
 			}
 			score/=numCharges;
 			BPtoN(newNode, score);
@@ -248,12 +248,12 @@ public class PropNetGamer extends StateMachineGamer {
 		return root.legalMoves.get(bestMoveIndex);
 	}
 
-	private int depthCharge(StateMachine m, Role r, MachineState s) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
+	private int depthCharge(Role r, MachineState s) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
 		if (PNSM.isTerminal(s)) {
 			return PNSM.getGoal(s,r);
 		}
 		List<Move> jointMoves = PNSM.getRandomJointMove(s);
-		return depthCharge(m,r,m.getNextState(s, jointMoves));
+		return depthCharge(r,PNSM.getNextState(s, jointMoves));
 	}
 
 	private void BPtoN(Node node, int score) {
@@ -351,7 +351,7 @@ public class PropNetGamer extends StateMachineGamer {
 		}
 
 		public void expand(Node node) throws MoveDefinitionException, TransitionDefinitionException {
-			if (PNSM.findTerminalp(node.state)) {
+			if (PNSM.isTerminal(node.state)) {
 				return;
 			}
 			this.legalMoves = PNSM.getLegalMoves(this.state, r);
@@ -380,9 +380,9 @@ public class PropNetGamer extends StateMachineGamer {
 		public Node parent;
 		public moveNode(Node parent, Move move, int moveNumber) throws MoveDefinitionException, TransitionDefinitionException {
 			this.parent=parent;
-			List<List<Move>> jointMoves = m.getLegalJointMoves(parent.state, r, move);
+			List<List<Move>> jointMoves = PNSM.getLegalJointMoves(parent.state, r, move);
 			for (List<Move> jointMove: jointMoves) {
-				MachineState nextState = m.getNextState(parent. state, jointMove);
+				MachineState nextState = PNSM.getNextState(parent.state, jointMove);
 				Node nextNode = new Node(this, moveNumber, nextState);
 				children.add(nextNode);
 			}

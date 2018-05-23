@@ -3,6 +3,7 @@ package ass1;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.ggp.base.util.gdl.grammar.Gdl;
@@ -22,7 +23,8 @@ import org.ggp.base.util.statemachine.Role;
 import org.ggp.base.util.statemachine.StateMachine;
 import org.ggp.base.util.statemachine.exceptions.GoalDefinitionException;
 import org.ggp.base.util.statemachine.exceptions.MoveDefinitionException;
-import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;;
+import org.ggp.base.util.statemachine.exceptions.TransitionDefinitionException;
+import org.ggp.base.util.statemachine.implementation.prover.query.ProverQueryBuilder;;
 
 public class PNStateMachine extends StateMachine {
 
@@ -105,6 +107,7 @@ public class PNStateMachine extends StateMachine {
 
 	@Override
 	public int getGoal(MachineState s, Role r) throws GoalDefinitionException {
+		clearPN();
 		int goal=0;
 		markBases(s.getContents());
 		Set<Proposition> goals=PN.getGoalPropositions().get(r);
@@ -117,6 +120,7 @@ public class PNStateMachine extends StateMachine {
 
 	@Override
 	public boolean isTerminal(MachineState s) {
+		clearPN();
 		markBases(s.getContents());
 		boolean b = propMark(PN.getTerminalProposition());
 		clearPN();
@@ -131,6 +135,7 @@ public class PNStateMachine extends StateMachine {
 
 	@Override
 	public List<Move> getLegalMoves(MachineState s, Role r) throws MoveDefinitionException {
+		clearPN();
 		markBases(s.getContents());
 		Set<Proposition> legals=PN.getLegalPropositions().get(r);
 		List<Move> moves=new ArrayList<Move>();
@@ -141,17 +146,27 @@ public class PNStateMachine extends StateMachine {
 		return moves;
 	}
 
+    private Set<GdlSentence> toDoes(List<Move> moves)
+    {
+        Set<GdlSentence> doeses = new HashSet<GdlSentence>();
+        Map<Role, Integer> roleIndices = getRoleIndices();
+        List<Role> roles=this.getRoles();
+
+        for (int i = 0; i < roles.size(); i++)
+        {
+            int index = roleIndices.get(roles.get(i));
+            doeses.add(ProverQueryBuilder.toDoes(roles.get(i), moves.get(index)));
+        }
+        return doeses;
+    }
+
 	@Override
 	public MachineState getNextState(MachineState s, List<Move> moves) throws TransitionDefinitionException {
-		Set<GdlSentence> set= new HashSet<GdlSentence>();
-		for (Move move: moves) {
-			set.add(move.getContents().toSentence());
-		}
-		markActions(set);
+		clearPN();
+		Set<GdlSentence> set= toDoes(moves);
 		markBases(s.getContents());
-
+		markActions(set);
 		Set<GdlSentence> nextState=new HashSet<GdlSentence>();
-
 		for (GdlSentence sent: PN.getBasePropositions().keySet()) {
 			if (propMark(PN.getBasePropositions().get(sent).getSingleInput().getSingleInput())) nextState.add(sent);
 		}
