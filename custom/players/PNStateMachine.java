@@ -1,9 +1,11 @@
-package ass1;
+package custom.players;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 
 import org.ggp.base.util.gdl.grammar.Gdl;
@@ -30,42 +32,76 @@ public class PNStateMachine extends StateMachine {
 
 	PropNet PN;
 	Role role;
-	Set<Component> all;
+	Set<Component> allComponents;
 
 	public PNStateMachine(List<Gdl> rules) throws InterruptedException {
 		PN = OptimizingPropNetFactory.create(rules, true);
 		clearPN();
 		PN.getInitProposition().setValue(true);
-
 	}
 
 	void prunePN() {
-		System.out.println(PN.getLegalPropositions().size());
-		all= new HashSet<Component>(PN.getComponents());
-		prunePNHelper((Component)PN.getTerminalProposition());
-		for (Proposition c: PN.getGoalPropositions().get(role)) {
-			prunePNHelper((Component)c);
-		}
-		for (Proposition c: PN.getLegalPropositions().get(role)) {
-			prunePNHelper((Component)c);
-		}
-		for (GdlSentence c: PN.getInputPropositions().keySet()) {
-			prunePNHelper((Component)PN.getInputPropositions().get(c));
-		}
-		for (Component c: all) {
-			PN.removeComponent(c);
-		}
-		System.out.println(PN.getLegalPropositions().size());
+		Set<Component> allComponents = new HashSet<Component>(PN.getComponents());
+        Queue<Component> q = new LinkedList<Component>();
+        Component t = PN.getTerminalProposition();
+        Map<GdlSentence, Proposition> m = PN.getInputPropositions();
+        q.add(t);
+        allComponents.remove(t);
+        
+        for (Set<Proposition> s : PN.getGoalPropositions().values()) {
+            for (Component c : s) {
+                q.add(c);
+                allComponents.remove(c);
+            }
+        }
+
+        while (!q.isEmpty()) {
+            Component c = q.remove();
+            Set<Component> newComponents = c.getInputs();
+            for (Component nC: newComponents) {
+                if (allComponents.contains(nC)) {
+                    allComponents.remove(nC);
+                    q.add(nC);
+
+                }
+            }
+        }
+
+        Map<Proposition, Proposition> legalInputMap = PN.getLegalInputMap();
+        for (Set<Proposition> s: PN.getLegalPropositions().values()) {
+            for (Component c: s) {
+                Component input = legalInputMap.get(c);
+                if (!allComponents.contains(input)) {
+                    q.add(c);
+                    allComponents.remove(c);
+                }
+            }
+        }
+
+        while (!q.isEmpty()) {
+            Component c = q.remove();
+            Set<Component> newComponents = c.getInputs();
+            for (Component nC: newComponents) {
+                if (allComponents.contains(nC)) {
+                    allComponents.remove(nC);
+                    q.add(nC);
+                }
+            }
+        }
+
+        for (Component c: allComponents) {
+            PN.removeComponent(c);
+        }
 	}
 
-	void prunePNHelper(Component p) {
-		if (all.contains(p)) {
-			all.remove(p);
-			for (Component prop: p.getInputs()) {
-				prunePNHelper(prop);
-			}
-		}
-	}
+//	void prunePNHelper(Component p) {
+//		if (all.contains(p)) {
+//			all.remove(p);
+//			for (Component prop: p.getInputs()) {
+//				prunePNHelper(prop);
+//			}
+//		}
+//	}
 
 
 	void setRole(Role r) {

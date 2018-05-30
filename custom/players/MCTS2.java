@@ -24,6 +24,8 @@ public class MCTS2 extends StateMachineGamer {
 	private MachineState s;
 	private Role r;
 	private int safety = 3000;
+
+	
 	@Override
 	public StateMachine getInitialStateMachine() {
 		// From RandomGamer
