@@ -29,10 +29,49 @@ import org.ggp.base.util.statemachine.implementation.prover.query.ProverQueryBui
 public class PNStateMachine extends StateMachine {
 
 	PropNet PN;
+	Role role;
+	Set<Component> all;
 
 	public PNStateMachine(List<Gdl> rules) throws InterruptedException {
 		PN = OptimizingPropNetFactory.create(rules, true);
+		clearPN();
+		PN.getInitProposition().setValue(true);
+
 	}
+
+	void prunePN() {
+		System.out.println(PN.getLegalPropositions().size());
+		all= new HashSet<Component>(PN.getComponents());
+		prunePNHelper((Component)PN.getTerminalProposition());
+		for (Proposition c: PN.getGoalPropositions().get(role)) {
+			prunePNHelper((Component)c);
+		}
+		for (Proposition c: PN.getLegalPropositions().get(role)) {
+			prunePNHelper((Component)c);
+		}
+		for (GdlSentence c: PN.getInputPropositions().keySet()) {
+			prunePNHelper((Component)PN.getInputPropositions().get(c));
+		}
+		for (Component c: all) {
+			PN.removeComponent(c);
+		}
+		System.out.println(PN.getLegalPropositions().size());
+	}
+
+	void prunePNHelper(Component p) {
+		if (all.contains(p)) {
+			all.remove(p);
+			for (Component prop: p.getInputs()) {
+				prunePNHelper(prop);
+			}
+		}
+	}
+
+
+	void setRole(Role r) {
+		role=r;
+	}
+
 
 	@Override
 	public List<Role> getRoles() {
