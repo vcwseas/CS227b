@@ -1,4 +1,4 @@
-package ass1;
+package custom.players;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +18,7 @@ import org.ggp.base.util.statemachine.implementation.prover.ProverStateMachine;;
 
 
 public class PropNetGamer extends StateMachineGamer {
-	int numCharges=10;
+	int numCharges=1;
 	int expCnst=30;
 	double avgDepth;
 	double currDepth;
@@ -33,13 +33,6 @@ public class PropNetGamer extends StateMachineGamer {
 	public StateMachine getInitialStateMachine() {
 		return new CachedStateMachine(new ProverStateMachine());
 	}
-
-//	private double metaDC(StateMachine m, MachineState s, int i, long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
-//		if (timeout - System.currentTimeMillis() < this.safety) return i;
-//		if (PNSM.isTerminal(s)) return i+1;
-//		List<Move> jointMoves = m.getRandomJointMove(s);
-//		return metaDC(m,PNSM.getNextState(s, jointMoves),i+1,timeout);
-//	}
 
 	private double recursionlessMetaDC(MachineState s,long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
 		double i=0;
@@ -64,24 +57,24 @@ public class PropNetGamer extends StateMachineGamer {
 
 
 		try {
-			PNSM = new PNStateMachine(getMatch().getGame().getRules());
+			PNSM = new PNStateMachine(getMatch().getGame().getRules(), timeout);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+			PNSM = (PNStateMachine) m;
 		}
-
-		avgDepth=0;
-		currDepth=0;
-
-		double count=0;
-		double levels=0;
-
-		while (timeout - System.currentTimeMillis() > this.safety) {
-			levels+=recursionlessMetaDC(m.getInitialState(),timeout);
-			count++;
-		}
-		avgDepth=levels/count*3/2;
-
+		System.out.println("PN READY");
+//		avgDepth=0;
+//		currDepth=0;
+//
+//		double count=0;
+//		double levels=0;
+//
+//		while (timeout - System.currentTimeMillis() > this.safety) {
+//			levels+=recursionlessMetaDC(m.getInitialState(),timeout);
+//			count++;
+//		}
+//		avgDepth=levels/count*3/2;
 
  	}
 
@@ -117,7 +110,7 @@ public class PropNetGamer extends StateMachineGamer {
 			expandSP(newNode);
 			int score=0;
 			for (int i=0; i<numCharges; i++) {
-				score += depthCharge(r, newNode.state);
+				score += depthCharge(r, newNode.state, timeout);
 			}
 			score/=numCharges;
 			BP(newNode, score);
@@ -225,7 +218,7 @@ public class PropNetGamer extends StateMachineGamer {
 			int score=0;
 			for (int i=0; i<numCharges; i++) {
 				dc++;
-				score += depthCharge(r, newNode.state);
+				score += depthCharge(r, newNode.state, timeout);
 			}
 			score/=numCharges;
 			BPtoN(newNode, score);
@@ -248,12 +241,15 @@ public class PropNetGamer extends StateMachineGamer {
 		return root.legalMoves.get(bestMoveIndex);
 	}
 
-	private int depthCharge(Role r, MachineState s) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
+	private int depthCharge(Role r, MachineState s, long timeout) throws GoalDefinitionException, TransitionDefinitionException, MoveDefinitionException{
 		if (PNSM.isTerminal(s)) {
 			return PNSM.getGoal(s,r);
 		}
+		if (timeout - System.currentTimeMillis() < this.safety) {
+			return 0;
+		}
 		List<Move> jointMoves = PNSM.getRandomJointMove(s);
-		return depthCharge(r,PNSM.getNextState(s, jointMoves));
+		return depthCharge(r,PNSM.getNextState(s, jointMoves), timeout);
 	}
 
 	private void BPtoN(Node node, int score) {
@@ -306,13 +302,13 @@ public class PropNetGamer extends StateMachineGamer {
 
 	private double selectfn(moveNode n) {
 		double exploit = (double) n.utility/n.visits;
-		double explore = expCnst()*Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
+		double explore = Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
 		return exploit + explore;
 	}
 
 	private double selectfnmin(Node n) {
 		double exploit = (double) n.utility/n.visits;
-		double explore = expCnst()*Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
+		double explore = Math.sqrt(2 * Math.log(n.parent.visits)/n.visits);
 		return -exploit + explore;
 	}
 
